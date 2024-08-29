@@ -1,6 +1,6 @@
 import aiomysql
 from fastapi import HTTPException
-from app.config import DB_NAME, DB_USER, DB_PASS, DB_HOST
+# from app.config import DB_NAME, DB_USER, DB_PASS, DB_HOST
 
 from dotenv import load_dotenv
 import os

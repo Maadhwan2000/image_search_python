@@ -27,10 +27,15 @@ redis_db = int(os.getenv("REDIS_DB"))
 
 router = APIRouter()
 
-redis_client = redis.from_url(redis_url, db=redis_db)
+redis_client = redis.from_url(redis_url, db=redis_db)  
 
-redis_client = redis.from_url("redis://localhost:6379", db=0)
+# for testing 
+# redis_client = redis.from_url("redis://172.19.0.3:6379", db=0)
+# redis_client = redis.from_url("redis://127.0.0.1:6379", db=0)
+#redis_client = redis.from_url("redis://host.docker.internal:6379", db=0)
+# redis_client = redis.from_url("redis://localhost:6379", db=0)
 # redis = redis.Redis(host='localhost', port=6379, db=0)
+
 processing = False
 
 

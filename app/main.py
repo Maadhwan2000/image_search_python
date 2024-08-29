@@ -4,7 +4,7 @@ from app.routers import search
 from app.services.model_service import model  
 from PIL import Image
 from app.services.model_service import get_embeddings  # get_embeddings_and_predictions  
-from app.services.chromadb_services import client
+from app.services.chromadb_services import get_chromadb_client
 from app.routers.sync import process_products
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +27,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
+
     global model 
     print("Model loaded on startup")
 
@@ -35,9 +36,10 @@ async def startup_event():
     print("Model warm-up completed")
 
     global client
-    print("Client Connected")
+    client = get_chromadb_client()
 
     asyncio.create_task(process_products())
+
 
 app.include_router(sync.router)
 app.include_router(search.router)

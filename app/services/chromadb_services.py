@@ -1,14 +1,29 @@
 import chromadb
 from fastapi import HTTPException
+import os
 
-# chroma db authentication wali use kerni hai 
-client = chromadb.HttpClient(host='localhost', port=8000)
-# client_two = chromadb.HttpClient(host='localhost', port=8000)
+
+chroma_db_url = os.getenv("CHROMADB_HOST")
+# client = chromadb.HttpClient(host='localhost', port=80100)
+
+def get_chromadb_client():
+    try:
+        # client = chromadb.HttpClient(host='172.19.0.2', port=8000)
+        # client = chromadb.HttpClient(host='localhost', port=8000)
+        client = chromadb.HttpClient(host=chroma_db_url, port=8000)
+        print("ChromaDB client connected.")
+        return client
+    except Exception as e:
+        print(f"ChromaDB connection error: {e}")
+        return None
+
+client = get_chromadb_client()
 
 def get_chromadb_client_and_collection(shop_name):
     try:
-        client = chromadb.HttpClient(host='localhost', port=8000)
-        print(client.heartbeat())
+        #client = chromadb.HttpClient(host=chromadb_host, port=8000)
+        # client = chromadb.HttpClient(host='localhost', port=8000)
+        # print(client.heartbeat())
         collection = client.get_or_create_collection(name=shop_name)
         print(collection)
         return collection
