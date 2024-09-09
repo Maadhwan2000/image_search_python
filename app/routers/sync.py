@@ -46,8 +46,9 @@ processing = False
 
 
 # function which gets all the shopify products
-async def fetch_shopify_products(shop_token: str):
-    api_url = 'https://siar-development.myshopify.com/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
+async def fetch_shopify_products(shop_token: str, shop_name: str ):
+    # api_url = 'https://siar-development.myshopify.com/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
+    api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
     headers = {'X-Shopify-Access-Token': shop_token}
     
     all_products = []  # List 
@@ -60,7 +61,7 @@ async def fetch_shopify_products(shop_token: str):
                 data = response.json()
                 products = data.get('products', [])
 
-                print (products) 
+                # print (products) 
                 
                 for product in products:
                     product_id = product.get('id')
@@ -124,7 +125,7 @@ async def get_or_create_shop_id(cursor, shop_name):
 async def get_shop_token(cursor, shop_name):
     try:
         sql = "SELECT accessToken FROM shopify_sessions WHERE shop = %s"
-        await cursor.execute(sql, (shop_name,))
+        await cursor.execute(sql, (shop_name))
         result = await cursor.fetchone()
         return result[0]
     except aiomysql.Error as e:
@@ -167,17 +168,17 @@ async def process_products():
     processing = True
     try:
         while processing:
-            item = await redis_client.lindex('sync_queue', 0)
+            item = await redis_client.lindex('sync_queue1', 0)
+            print(item)
+            length = await redis_client.llen('sync_queue1')
+            # print(f"Length of sync_queue1: {length}")
             if not item:
                 processing = False
                 break
 
             data = json.loads(item)
-            print(data)
             shop_name = data.get("shop_name")
-            #shop_token = data.get("shop_token")
-            print(shop_name)
-            #print(shop_token)
+
 
             try:
                 pool = await get_db_connection()
@@ -191,6 +192,7 @@ async def process_products():
 
             except Exception as e:
                 print(f"Error fetching or creating shop_id: {e}")
+                await redis_client.lpop('sync_queue1')
                 continue
 
             try:
@@ -203,11 +205,12 @@ async def process_products():
                 await pool.wait_closed()
 
             except Exception as e:
-                print(f"Error fetching or creating shop_id: {e}")
+                print(f"Error fetching shop token: {e}")
+                await redis_client.lpop('sync_queue1')
                 continue
 
 
-            products = await fetch_shopify_products(shop_token)
+            products = await fetch_shopify_products(shop_token , shop_name)
             collection = get_chromadb_collection(shop_name)
 
             for index, product in enumerate(products):
@@ -265,7 +268,7 @@ async def process_products():
                 print(f"Error inserting sync time: {e}")
 
             # Remove the processed item from the queue
-            await redis_client.lpop('sync_queue')
+            await redis_client.lpop('sync_queue1')
 
     except Exception as e:
         print(f"Error processing queue: {e}")
@@ -283,6 +286,11 @@ async def sync_data(request: Request, background_tasks: BackgroundTasks):
     try:
         data = await request.json()
         shop_name = data.get("shop_name")
+        length = await redis_client.llen('sync_queue1')
+        print(f"Length of sync_queue1: {length}")
+        # await redis_client.delete('sync_queue1')  # This will remove the entire key 'sync_queue1'
+
+
         # shop_token = data.get("shop_token")
 
         if not shop_name: # or not shop_token:
@@ -295,7 +303,7 @@ async def sync_data(request: Request, background_tasks: BackgroundTasks):
         }
 
         data_json = json.dumps(data)
-        await redis_client.rpush('sync_queue', data_json)
+        await redis_client.rpush('sync_queue1', data_json)
 
         if processing == False:
             processing = True

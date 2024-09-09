@@ -52,3 +52,13 @@ def get_chromadb_collection_for_searching(shop_name):
     except Exception as e:
         print(f"ChromaDB connection or collection creation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to ChromaDB or create collection")
+    
+
+
+
+def del_chromadb_collection(shop_name):
+    try:
+        client.delete_collection(name=shop_name)    
+    except Exception as e:
+        print(f"ChromaDB connection or collection creation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to connect to ChromaDB or delete collection")

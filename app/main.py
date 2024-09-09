@@ -1,6 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks
 from app.routers import sync
 from app.routers import search
+from app.routers import delete_queue
 from app.services.model_service import model  
 from PIL import Image
 from app.services.model_service import get_embeddings  # get_embeddings_and_predictions  
@@ -43,6 +44,7 @@ async def startup_event():
 
 app.include_router(sync.router)
 app.include_router(search.router)
+app.include_router(delete_queue.router)
 
 if __name__ == '__main__':
     import uvicorn

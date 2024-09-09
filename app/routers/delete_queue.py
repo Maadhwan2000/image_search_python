@@ -9,6 +9,7 @@ import redis.asyncio as redis
 import os
 import redis.asyncio as redis
 from dotenv import load_dotenv
+from app.services.chromadb_services import del_chromadb_collection
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ redis_client = redis.from_url(redis_url, db=redis_db)
 
 router = APIRouter()
 
-@router.delete("/sync")
+@router.delete("/delete")
 async def delete_sync_data(request: Request):
     try:
         data = await request.json()
@@ -27,14 +28,20 @@ async def delete_sync_data(request: Request):
 
         if not shop_name:
             raise HTTPException(status_code=400, detail="Missing required fields")
-
-        queue = await redis_client.lrange('sync_queue', 0, -1)
         
-        for item in queue:
-            item_data = json.loads(item)
-            if item_data.get("shop_name") == shop_name:
-                await redis_client.lrem('sync_queue', 0, item)
-                return {"status": "success", "detail": f"Removed shop_name: {shop_name}"}
+        # del_chromadb_collection(shop_name)
+
+        queue = await redis_client.lrange('sync_queue1', 0, -1)
+        # print(shop_name)
+        # print(queue)
+        # print("in delete")
+        data_to_remove = json.dumps({"shop_name": shop_name})
+
+        # Remove all matching entries from the list
+        await redis_client.lrem('sync_queue1', 0, data_to_remove)
+
+        return {"message": f"Successfully removed entries for shop_name: {shop_name}"}
+
 
         raise HTTPException(status_code=404, detail=f"shop_name: {shop_name} not found in the queue")
 
