@@ -48,7 +48,7 @@ processing = False
 # function which gets all the shopify products
 async def fetch_shopify_products(shop_token: str, shop_name: str ):
     # api_url = 'https://siar-development.myshopify.com/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
-    api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
+    api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
     headers = {'X-Shopify-Access-Token': shop_token}
     
     all_products = []  # List 
@@ -68,12 +68,17 @@ async def fetch_shopify_products(shop_token: str, shop_name: str ):
                     image = product.get('image')
                     title =product.get('title')
                     handle = product.get('handle')
+
+                    tags = product.get('tags')
+                    vendor = product.get('vendor')
+                    product_type = product.get('product_type')
+
                     price = product['variants'][0].get('price')
                     # price=variants.get('price')
                     image_src = image.get('src') if image else None
                     if product_id and image_src:
-                        all_products.append({'id': product_id, 'image_src': image_src , 'title':title, 'handle':handle, 'price':price })
-# all_products.append({'id': product_id, 'image_src': image_src , 'title':title , 'price':price, 'handle':handle})
+                        all_products.append({'id': product_id, 'image_src': image_src , 'title':title, 'handle':handle, 'price':price, 'tags':tags, 'vendor':vendor, 'product_type':product_type })
+                    # all_products.append({'id': product_id, 'image_src': image_src , 'title':title , 'price':price, 'handle':handle})
 
 
                 # Pagination handling
@@ -88,9 +93,11 @@ async def fetch_shopify_products(shop_token: str, shop_name: str ):
                 api_url = next_url
             
             except httpx.HTTPStatusError as http_err:
-                print(f"HTTP error occurred: {http_err}")
+                print(f"HTTP error occurred: {http_err}") 
+                await redis_client.lpop('sync_queue1')
             except Exception as err:
                 print(f"An error occurred: {err}")
+                await redis_client.lpop('sync_queue1')
 
     # print(f"Total products fetched: {len(all_products)}")
     # print("Fetched Products Data:", all_products)
@@ -219,11 +226,17 @@ async def process_products():
                 title = product['title']
                 price = product['price']
                 handle = product['handle']
+                tags = product['tags']
+                vendor = product['vendor']
+                product_type = product['product_type']
 
                 metadata = {
                 'price': price,
                 'handle': handle,
-                'image_src':image_src
+                'image_src':image_src,
+                'tags':tags,
+                'vendor':vendor,
+                'product_type':product_type
                 }
                
 

@@ -22,6 +22,8 @@ async def upload_image(shop_name: str = Form(...), file: UploadFile = File(...))
             print(f"Image processing error: {e}")
             raise HTTPException(status_code=400, detail="Invalid image file")
         
+        if file.content_type == 'image/png':
+            img = img.convert('RGB')
 
         img = img.resize((299, 299))
         embeddings = get_embeddings(img)

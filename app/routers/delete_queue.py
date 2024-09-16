@@ -32,16 +32,11 @@ async def delete_sync_data(request: Request):
         # del_chromadb_collection(shop_name)
 
         queue = await redis_client.lrange('sync_queue1', 0, -1)
-        # print(shop_name)
-        # print(queue)
-        # print("in delete")
-        data_to_remove = json.dumps({"shop_name": shop_name})
+        data_to_remove = json.dumps({"shop_name": shop_name})    #converts to json string
 
-        # Remove all matching entries from the list
         await redis_client.lrem('sync_queue1', 0, data_to_remove)
 
         return {"message": f"Successfully removed entries for shop_name: {shop_name}"}
-
 
         raise HTTPException(status_code=404, detail=f"shop_name: {shop_name} not found in the queue")
 
