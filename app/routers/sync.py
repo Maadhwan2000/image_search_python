@@ -114,78 +114,155 @@ processing = False
 
 
 
-async def fetch_shopify_products(shop_token: str, shop_name: str):
+# async def fetch_shopify_products(shop_token: str, shop_name: str):
+#     api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
+#     headers = {'X-Shopify-Access-Token': shop_token}
+    
+#     all_products = []
+#     count = 1
+
+#     async with httpx.AsyncClient() as client:
+#         while api_url:
+#             print(f"Fetching page: {count}")
+#             try:
+#                 response = await client.get(api_url, headers=headers)
+#                 response.raise_for_status()
+#                 data = response.json()
+#                 products = data.get('products', [])
+                
+#                 for product in products:
+#                     product_id = product.get('id')
+#                     image = product.get('image')
+#                     title = product.get('title')
+#                     handle = product.get('handle')
+#                     tags = product.get('tags')
+#                     vendor = product.get('vendor')
+#                     product_type = product.get('product_type')
+                    
+#                     price = product['variants'][0].get('price')
+#                     compare_at_price = product['variants'][0].get('compare_at_price', None) or -1
+#                     image_src = image.get('src') if image else None
+#                     if product_id and image_src:
+#                         all_products.append({
+#                             'id': product_id,
+#                             'image_src': image_src,
+#                             'title': title,
+#                             'handle': handle,
+#                             'price': price,
+#                             'tags': tags,
+#                             'vendor': vendor,
+#                             'product_type': product_type,
+#                             'compare_at_price': compare_at_price
+#                         })
+                
+#                 # Print the Link header for debugging
+#                 link_header = response.headers.get('Link', '')
+#                 print(f"Link header: {link_header}")
+
+#                 # Pagination handling
+#                 next_url = None
+#                 if 'rel="next"' in link_header:
+#                     parts = link_header.split(',')
+#                     for part in parts:
+#                         if 'rel="next"' in part:
+#                             next_url = part.split(';')[0].strip('<> ')
+#                             break
+#                 api_url = next_url
+
+#                 # Increment the page count
+#                 count += 1
+            
+#             except httpx.HTTPStatusError as http_err:
+#                 print(f"HTTP error occurred: {http_err}") 
+#                 break
+#             except Exception as err:
+#                 print(f"An error occurred: {err}")
+#                 break
+
+#     return all_products
+
+
+
+
+
+
+from httpx import RequestError, TimeoutException
+
+async def fetch_shopify_products(shop_token: str, shop_name: str, max_retries: int = 3, retry_delay: float = 1.0):
     api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
     headers = {'X-Shopify-Access-Token': shop_token}
     
     all_products = []
     count = 1
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=20) as client:
         while api_url:
             print(f"Fetching page: {count}")
-            try:
-                response = await client.get(api_url, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                products = data.get('products', [])
-                
-                for product in products:
-                    product_id = product.get('id')
-                    image = product.get('image')
-                    title = product.get('title')
-                    handle = product.get('handle')
-                    tags = product.get('tags')
-                    vendor = product.get('vendor')
-                    product_type = product.get('product_type')
-                    
-                    price = product['variants'][0].get('price')
-                    compare_at_price = product['variants'][0].get('compare_at_price', None) or -1
-                    image_src = image.get('src') if image else None
-                    if product_id and image_src:
-                        all_products.append({
-                            'id': product_id,
-                            'image_src': image_src,
-                            'title': title,
-                            'handle': handle,
-                            'price': price,
-                            'tags': tags,
-                            'vendor': vendor,
-                            'product_type': product_type,
-                            'compare_at_price': compare_at_price
-                        })
-                
-                # Print the Link header for debugging
-                link_header = response.headers.get('Link', '')
-                print(f"Link header: {link_header}")
-
-                # Pagination handling
-                next_url = None
-                if 'rel="next"' in link_header:
-                    parts = link_header.split(',')
-                    for part in parts:
-                        if 'rel="next"' in part:
-                            next_url = part.split(';')[0].strip('<> ')
-                            break
-                api_url = next_url
-
-                # Increment the page count
-                count += 1
+            retries = 0
             
-            except httpx.HTTPStatusError as http_err:
-                print(f"HTTP error occurred: {http_err}") 
-                break
-            except Exception as err:
-                print(f"An error occurred: {err}")
-                break
+            while retries < max_retries:
+                try:
+                    response = await client.get(api_url, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    products = data.get('products', [])
+
+                    for product in products:
+                        product_id = product.get('id')
+                        image = product.get('image')
+                        title = product.get('title')
+                        handle = product.get('handle')
+                        tags = product.get('tags')
+                        vendor = product.get('vendor')
+                        product_type = product.get('product_type')
+
+                        price = product['variants'][0].get('price')
+                        compare_at_price = product['variants'][0].get('compare_at_price', None) or -1
+                        image_src = image.get('src') if image else None
+                        if product_id and image_src:
+                            all_products.append({
+                                'id': product_id,
+                                'image_src': image_src,
+                                'title': title,
+                                'handle': handle,
+                                'price': price,
+                                'tags': tags,
+                                'vendor': vendor,
+                                'product_type': product_type,
+                                'compare_at_price': compare_at_price
+                            })
+
+                    # Print the Link header for debugging
+                    link_header = response.headers.get('Link', '')
+                    print(f"Link header: {link_header}")
+
+                    # Pagination handling
+                    next_url = None
+                    if 'rel="next"' in link_header:
+                        parts = link_header.split(',')
+                        for part in parts:
+                            if 'rel="next"' in part:
+                                next_url = part.split(';')[0].strip('<> ')
+                                break
+                    api_url = next_url
+
+                    # Increment the page count
+                    count += 1
+                    break  # Break out of retry loop if successful
+
+                except (httpx.HTTPStatusError, RequestError, TimeoutException) as http_err:
+                    retries += 1
+                    print(f"Error occurred: {http_err} - Retrying ({retries}/{max_retries})...")
+                    if retries == max_retries:
+                        print("Max retries reached. Exiting.")
+                        return all_products
+                    await asyncio.sleep(retry_delay * retries)  # Exponential backoff
+
+                except Exception as err:
+                    print(f"An unexpected error occurred: {err}")
+                    return all_products
 
     return all_products
-
-
-
-
-
-
 
 
 
