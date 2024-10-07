@@ -380,8 +380,9 @@ async def process_products():
 
             except Exception as e:
                 print(f"Error fetching shop token: {e}")
-                # await redis_client.lpop('sync_queue1')
+                await redis_client.lpop('sync_queue1')
                 continue
+
 
 
             products = await fetch_shopify_products(shop_token , shop_name)
@@ -419,6 +420,9 @@ async def process_products():
                         img = Image.open(BytesIO(img_response.content))
                     except Exception as e:
                         raise ValueError(f"Error opening image: {e}")
+
+                    if img.format == 'PNG':
+                        img = img.convert('RGB')
 
                     img = img.resize((299, 299))
                     start_time = time.time()
