@@ -35,8 +35,8 @@ def get_chromadb_client_and_collection(shop_name):
 
 def get_chromadb_collection(shop_name):
     try:
-        collection = client.get_or_create_collection(name=shop_name)
-        client.delete_collection(name=shop_name)     # if a product is removed then it isnt removed from chorma , thats why deleting the whole collection so only the latest products show up
+        # collection = client.get_or_create_collection(name=shop_name)
+        # client.delete_collection(name=shop_name)     # if a product is removed then it isnt removed from chorma , thats why deleting the whole collection so only the latest products show up
         collection = client.get_or_create_collection(name=shop_name)
         print(collection)
         return collection

@@ -19,17 +19,17 @@ import redis.asyncio as redis
 import os
 import redis.asyncio as redis
 from dotenv import load_dotenv
-
+from httpx import RequestError, TimeoutException
 load_dotenv()
+from datetime import timedelta
 
 redis_url = os.getenv("REDIS_URL")
 redis_db = int(os.getenv("REDIS_DB"))
 
-# redis_url = "redis://127.0.0.1:6379"  # Replace with your Redis URL if different
+# redis_url = "redis://127.0.0.1:6379"  
 # redis_db = 0 
 
 router = APIRouter()
-
 redis_client = redis.from_url(redis_url, db=redis_db)  
 
 # for testing 
@@ -44,7 +44,7 @@ processing = False
 
 
 # all the functions being used in the sync api have been written here
-# these functioon can later be put in different folders to followe FastApis folder structure
+# these functioon can later be put in different folders to follow FastApis folder structure
 
 
 
@@ -186,14 +186,35 @@ processing = False
 
 
 
-from httpx import RequestError, TimeoutException
 
-async def fetch_shopify_products(shop_token: str, shop_name: str, max_retries: int = 3, retry_delay: float = 1.0):
-    api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
-    headers = {'X-Shopify-Access-Token': shop_token}
+async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int , max_retries: int = 3, retry_delay: float = 1.0):
+    # api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
+    # api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250'
+    # headers = {'X-Shopify-Access-Token': shop_token}
     
     all_products = []
     count = 1
+
+    # select url based on sync time 
+    # if sync time not 0 then convert sync time to utc here and pass in url 
+    if sync_time == 0:
+        # print("Hello")
+        api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250'
+
+    else:
+        # print("Hi")
+        # print(sync_time)
+
+        utc_time = sync_time - timedelta(hours=5)  # my server is in pk time so subtracting 5 
+
+        # Convert the datetime object to the desired ISO 8601 format
+        formatted_datetime = utc_time.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+        # print(formatted_datetime)
+
+        api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250&updated_at_min={formatted_datetime}'
+
+
+    headers = {'X-Shopify-Access-Token': shop_token}
 
     async with httpx.AsyncClient(timeout=20) as client:
         while api_url:
@@ -215,6 +236,7 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, max_retries: i
                         tags = product.get('tags')
                         vendor = product.get('vendor')
                         product_type = product.get('product_type')
+                        status=product.get('status')
 
                         price = product['variants'][0].get('price')
                         compare_at_price = product['variants'][0].get('compare_at_price', None) or -1
@@ -229,7 +251,8 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, max_retries: i
                                 'tags': tags,
                                 'vendor': vendor,
                                 'product_type': product_type,
-                                'compare_at_price': compare_at_price
+                                'compare_at_price': compare_at_price,
+                                'status':status
                             })
 
                     # Print the Link header for debugging
@@ -307,6 +330,21 @@ async def get_shop_token(cursor, shop_name):
 
 
 
+#we get the sync time from the database
+async def get_shop_synctime(cursor, shop_id):
+    try:
+        sql = "SELECT time FROM sync_time WHERE shop_id = %s"
+        await cursor.execute(sql, (shop_id))
+        result = await cursor.fetchone()
+        if result is None: 
+            return 0  
+        
+        return result[0]  
+ 
+    except aiomysql.Error as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
 #after the products have been synced for a shop the sync time is saved , can be later shown to the user if needed 
 async def insert_sync_time(cursor, sync_time, shop_id):
     try:
@@ -341,6 +379,7 @@ async def process_products():
     global processing 
     processing = True
     try:
+        pool = await get_db_connection()
         while processing:
             item = await redis_client.lindex('sync_queue1', 0)
             print(item)
@@ -355,14 +394,14 @@ async def process_products():
 
 
             try:
-                pool = await get_db_connection()
+                # pool = await get_db_connection()
                 async with pool.acquire() as connection:
                     async with connection.cursor() as cursor:
                         shop_id = await get_or_create_shop_id(cursor, shop_name)
                         print(shop_id)
 
-                pool.close()
-                await pool.wait_closed()
+                # pool.close()
+                # await pool.wait_closed()
 
             except Exception as e:
                 print(f"Error fetching or creating shop_id: {e}")
@@ -370,13 +409,13 @@ async def process_products():
                 continue
 
             try:
-                pool = await get_db_connection()
+                # pool = await get_db_connection()
                 async with pool.acquire() as connection:
                     async with connection.cursor() as cursor:
                         shop_token = await get_shop_token(cursor, shop_name)
 
-                pool.close()
-                await pool.wait_closed()
+                # pool.close()
+                # await pool.wait_closed()
 
             except Exception as e:
                 print(f"Error fetching shop token: {e}")
@@ -384,8 +423,37 @@ async def process_products():
                 continue
 
 
+            # sync time work 
+            try:
+                # pool = await get_db_connection()
+                async with pool.acquire() as connection:
+                    async with connection.cursor() as cursor:
+                        sync_time = await get_shop_synctime(cursor, shop_id)
 
-            products = await fetch_shopify_products(shop_token , shop_name)
+                print(sync_time)
+                # pool.close()
+                # await pool.wait_closed()
+
+            except Exception as e:
+                print(f"Error fetching sync_time: {e}")
+                await redis_client.lpop('sync_queue1')
+                continue
+
+
+            # async with pool.acquire() as connection:
+            #     async with connection.cursor() as cursor:
+            # try:
+            # shop_id = await get_or_create_shop_id(cursor, shop_name)
+            # shop_token = await get_shop_token(cursor, shop_name)
+            # sync_time = await get_shop_synctime(cursor, shop_id)
+            # except Exception as e:
+            # print(f"Error fetching data: {e}")
+            # await redis_client.lpop('sync_queue1')
+            # continue
+
+
+
+            products = await fetch_shopify_products(shop_token , shop_name, sync_time)
             collection = get_chromadb_collection(shop_name)
 
             for index, product in enumerate(products):
@@ -395,6 +463,7 @@ async def process_products():
                 price = product['price']
                 compare_at_price=product['compare_at_price']
                 handle = product['handle']
+                status = product['status']
                 tags = product['tags']
                 vendor = product['vendor']
                 product_type = product['product_type']
@@ -406,7 +475,8 @@ async def process_products():
                 'tags':tags,
                 'vendor':vendor,
                 'product_type':product_type,
-                "compare_at_price":compare_at_price
+                "compare_at_price":compare_at_price,
+                "status":status
                 }
                
 
@@ -441,14 +511,14 @@ async def process_products():
                     print(f"Error processing image for product {product_id} at {image_src}: {e}")
 
             try:
-                pool = await get_db_connection()
+                # pool = await get_db_connection()
                 async with pool.acquire() as connection:
                     async with connection.cursor() as cursor:
                         now = datetime.now().isoformat()  # Get the current time in ISO format
                         await insert_sync_time(cursor, now, shop_id)
 
-                pool.close()
-                await pool.wait_closed()
+                # pool.close()
+                # await pool.wait_closed()
 
             except Exception as e:
                 print(f"Error inserting sync time: {e}")
@@ -460,6 +530,8 @@ async def process_products():
         print(f"Error processing queue: {e}")
 
     finally:
+        pool.close()
+        await pool.wait_closed()
         processing = False
 
 

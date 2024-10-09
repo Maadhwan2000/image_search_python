@@ -29,7 +29,7 @@ async def upload_image(shop_name: str = Form(...), file: UploadFile = File(...))
         embeddings = get_embeddings(img)
         #embeddings,top_categories = get_embeddings_and_predictions(img)
         collection = get_chromadb_collection_for_searching(shop_name)
-        results = collection.query(query_embeddings=embeddings, n_results=13)
+        results = collection.query(query_embeddings=embeddings, n_results=13,where={"status": "active"})
 
 
 #approach didnt work 
