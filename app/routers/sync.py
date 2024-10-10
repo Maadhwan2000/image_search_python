@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from httpx import RequestError, TimeoutException
 load_dotenv()
 from datetime import timedelta
+import gc
 
 redis_url = os.getenv("REDIS_URL")
 redis_db = int(os.getenv("REDIS_DB"))
@@ -378,6 +379,7 @@ def upsert_to_chromadb(collection, product_id, embeddings,metadatas, title):
 async def process_products():
     global processing 
     processing = True
+    pool = None
     try:
         pool = await get_db_connection()
         while processing:
@@ -456,6 +458,7 @@ async def process_products():
             products = await fetch_shopify_products(shop_token , shop_name, sync_time)
             collection = get_chromadb_collection(shop_name)
 
+            batch_size = 100
             for index, product in enumerate(products):
                 product_id = product['id']
                 image_src = product['image_src']
@@ -488,8 +491,10 @@ async def process_products():
 
                     try:
                         img = Image.open(BytesIO(img_response.content))
+                        # with Image.open(BytesIO(img_response.content)) as img:
                     except Exception as e:
                         raise ValueError(f"Error opening image: {e}")
+                    
 
                     if img.format == 'PNG':
                         img = img.convert('RGB')
@@ -509,6 +514,9 @@ async def process_products():
 
                 except Exception as e:
                     print(f"Error processing image for product {product_id} at {image_src}: {e}")
+
+                if (index + 1) % batch_size == 0:
+                    gc.collect()
 
             try:
                 # pool = await get_db_connection()
@@ -533,6 +541,7 @@ async def process_products():
         pool.close()
         await pool.wait_closed()
         processing = False
+
 
 
 
