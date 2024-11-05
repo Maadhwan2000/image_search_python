@@ -23,6 +23,7 @@ from httpx import RequestError, TimeoutException
 load_dotenv()
 from datetime import timedelta
 import gc
+from app.routers.count import countobj 
 
 redis_url = os.getenv("REDIS_URL")
 redis_db = int(os.getenv("REDIS_DB"))
@@ -379,9 +380,12 @@ def upsert_to_chromadb(collection, product_id, embeddings,metadatas, title):
 async def process_products():
     global processing 
     processing = True
-    pool = None
+    # pool = None
+    countobj["total_products"]=0
+    countobj["synced_products"]=0
+    pool = await get_db_connection()
     try:
-        pool = await get_db_connection()
+        # pool = await get_db_connection()
         while processing:
             item = await redis_client.lindex('sync_queue1', 0)
             print(item)
@@ -456,6 +460,8 @@ async def process_products():
 
 
             products = await fetch_shopify_products(shop_token , shop_name, sync_time)
+            countobj["shop_name"]=shop_name
+            countobj["total_products"]=len(products)
             collection = get_chromadb_collection(shop_name)
 
             batch_size = 100
@@ -511,6 +517,7 @@ async def process_products():
                     print(f"Time from image download to saving in ChromaDB for product {product_id}: {embedding_time:.2f} seconds")
 
                     print(f"Processed {index + 1}/{len(products)} products. Remaining: {len(products) - (index + 1)}")
+                    countobj["synced_products"]=index + 1
 
                 except Exception as e:
                     print(f"Error processing image for product {product_id} at {image_src}: {e}")
