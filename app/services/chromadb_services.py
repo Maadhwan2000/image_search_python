@@ -59,6 +59,7 @@ def get_chromadb_collection_for_searching(shop_name):
 
 def del_chromadb_collection(shop_name):
     try:
+        collection = client.get_or_create_collection(name=shop_name)
         client.delete_collection(name=shop_name)    
     except Exception as e:
         print(f"ChromaDB connection or collection creation error: {e}")

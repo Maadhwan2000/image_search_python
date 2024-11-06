@@ -3,6 +3,7 @@ from app.routers import sync
 from app.routers import search
 from app.routers import delete_queue
 from app.routers import count
+from app.routers import deleteTime
 from app.services.model_service import model  
 from PIL import Image
 from app.services.model_service import get_embeddings  # get_embeddings_and_predictions  
@@ -50,6 +51,8 @@ app.include_router(sync.router)
 app.include_router(search.router)
 app.include_router(delete_queue.router)
 app.include_router(count.router)
+app.include_router(deleteTime.router)
+
 
 if __name__ == '__main__':
     import uvicorn

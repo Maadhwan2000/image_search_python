@@ -347,6 +347,24 @@ async def get_shop_synctime(cursor, shop_id):
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
+# get the plan details , status and count 
+async def get_pricing_plan(cursor, shop_id):
+    try:
+        sql = "SELECT product_count, status FROM pricing_plans WHERE shop_id = %s"
+        await cursor.execute(sql, (shop_id,))
+        result = await cursor.fetchone()
+        
+        if result is None:
+            return {"product_count": 0, "status": "Unknown"}
+        
+        product_count, status = result
+        return {"product_count": product_count, "status": status}
+    
+    except aiomysql.Error as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
+
 #after the products have been synced for a shop the sync time is saved , can be later shown to the user if needed 
 async def insert_sync_time(cursor, sync_time, shop_id):
     try:
@@ -444,6 +462,21 @@ async def process_products():
                 print(f"Error fetching sync_time: {e}")
                 await redis_client.lpop('sync_queue1')
                 continue
+            
+            # sync time work 
+            try:
+                async with pool.acquire() as connection:
+                    async with connection.cursor() as cursor:
+                        pricing_plan = await get_pricing_plan(cursor, shop_id)
+                        pricing_plan = await get_pricing_plan(cursor, shop_id)
+                        plan_product_count = pricing_plan['product_count']
+                        status = pricing_plan['status']
+
+            except Exception as e:
+                print(f"Error fetching pricing_plan: {e}")
+                await redis_client.lpop('sync_queue1')
+                continue
+
 
 
             # async with pool.acquire() as connection:
@@ -465,7 +498,9 @@ async def process_products():
             collection = get_chromadb_collection(shop_name)
 
             batch_size = 100
-            for index, product in enumerate(products):
+            # for index, product in enumerate(products):
+            for index, product in enumerate(products[:plan_product_count]):
+                print(index)
                 product_id = product['id']
                 image_src = product['image_src']
                 title = product['title']
@@ -490,7 +525,6 @@ async def process_products():
                
 
                 try:
-                    # Download and open the image asynchronously
                     img_response = await run_in_threadpool(requests.get, image_src)
                     if img_response.status_code != 200:
                         raise ValueError(f"Failed to download image, status code: {img_response.status_code}")
