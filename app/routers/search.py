@@ -1,14 +1,16 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from PIL import Image
 import io
-from app.services.model_service import get_embeddings   #get_embeddings_and_predictions 
-from app.services.chromadb_services import get_chromadb_collection_for_searching #get_chromadb_collection
+from app.services.model_service import get_embeddings   
+from app.services.chromadb_services import get_chromadb_collection_for_searching 
 
 router = APIRouter()
 
+# /upload endpoint
 @router.post("/upload")
 async def upload_image(shop_name: str = Form(...), file: UploadFile = File(...)):
     try:
+        #if shop name not sent in the api
         if not shop_name:
             raise HTTPException(status_code=400, detail="Missing required field: shop_name")
 
@@ -22,14 +24,19 @@ async def upload_image(shop_name: str = Form(...), file: UploadFile = File(...))
             print(f"Image processing error: {e}")
             raise HTTPException(status_code=400, detail="Invalid image file")
         
+        #png file not supported so convert png to rgb
         if file.content_type == 'image/png':
             img = img.convert('RGB')
 
-        img = img.resize((299, 299))
-        embeddings = get_embeddings(img)
-        #embeddings,top_categories = get_embeddings_and_predictions(img)
+        img = img.resize((299, 299)) #resizing to the supported size by the model 
+        embeddings = get_embeddings(img) # converting it into vector embedding
+
+        # getting the collection from chromadb
         collection = get_chromadb_collection_for_searching(shop_name)
-        results = collection.query(query_embeddings=embeddings, n_results=13,where={"status": "active"})
+
+        ##chromadb query, more info on this in the chromadb docs 
+        # return only the first 13 results where status is active 
+        results = collection.query(query_embeddings=embeddings, n_results=13,where={"status": "active"}) 
 
 
 #approach didnt work 
@@ -63,7 +70,7 @@ async def upload_image(shop_name: str = Form(...), file: UploadFile = File(...))
 
 
 
-
+## work below is for when tested with different models 
 
 
 

@@ -5,6 +5,10 @@ app = APIRouter()
 
 router = APIRouter()
 
+
+# polling
+# we hit this api after every 20 secs when the store is syncing , 
+# this returns the count of the products synced and we use that to calculate the percentage 
 @router.post("/count")
 async def get_count(req: Request):
     try:

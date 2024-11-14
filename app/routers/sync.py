@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request , BackgroundTasks
 import aiomysql
 from app.db.connections import get_db_connection
 from app.services.chromadb_services import get_chromadb_collection
-from app.services.model_service import get_embeddings   #get_embeddings_and_predictions 
+from app.services.model_service import get_embeddings, clear_cache   
 import requests
 import httpx
 import asyncio
@@ -13,7 +13,6 @@ from io import BytesIO
 import tempfile
 from datetime import datetime
 from fastapi.concurrency import run_in_threadpool
-# import redis
 import json
 import redis.asyncio as redis
 import os
@@ -49,169 +48,27 @@ processing = False
 # these functioon can later be put in different folders to follow FastApis folder structure
 
 
-
-# function which gets all the shopify products
-# async def fetch_shopify_products(shop_token: str, shop_name: str ):
-#     # api_url = 'https://siar-development.myshopify.com/admin/api/2024-01/products.json?fields=id,image,title,handle,variants&limit=250'
-#     api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
-#     headers = {'X-Shopify-Access-Token': shop_token}
-    
-#     all_products = []  # List 
-#     count=1
-
-#     async with httpx.AsyncClient() as client:
-#         while api_url:
-#             print(count)
-#             try:
-#                 response = await client.get(api_url, headers=headers)
-#                 response.raise_for_status()
-#                 data = response.json()
-#                 products = data.get('products', [])
-
-#                 # print (products) 
-                
-#                 for product in products:
-#                     product_id = product.get('id')
-#                     image = product.get('image')
-#                     title =product.get('title')
-#                     handle = product.get('handle')
-
-#                     tags = product.get('tags')
-#                     vendor = product.get('vendor')
-#                     product_type = product.get('product_type')
-
-#                     price = product['variants'][0].get('price')
-#                     compare_at_price = product['variants'][0].get('compare_at_price', None) or -1  # if it is null then we put -1 as cant insert null in chromadb
-#                     # price=variants.get('price')
-#                     image_src = image.get('src') if image else None
-#                     if product_id and image_src:
-#                         all_products.append({'id': product_id, 'image_src': image_src , 'title':title, 'handle':handle, 'price':price, 'tags':tags, 'vendor':vendor, 'product_type':product_type,'compare_at_price':compare_at_price })
-#                     # all_products.append({'id': product_id, 'image_src': image_src , 'title':title , 'price':price, 'handle':handle})
-
-
-#                 # Pagination handling
-#                 link_header = response.headers.get('Link', '')
-#                 next_url = None
-#                 if 'rel="next"' in link_header:
-#                     parts = link_header.split(',')
-#                     for part in parts:
-#                         if 'rel="next"' in part:
-#                             next_url = part.split(';')[0].strip('<> ')
-#                             break
-#                 api_url = next_url
-            
-#             except httpx.HTTPStatusError as http_err:
-#                 print(f"HTTP error occurred: {http_err}") 
-#                 # await redis_client.lpop('sync_queue1')
-#                 break
-#             except Exception as err:
-#                 print(f"An error occurred: {err}")
-#                 # await redis_client.lpop('sync_queue1')
-#                 break
-
-#     # print(f"Total products fetched: {len(all_products)}")
-#     # print("Fetched Products Data:", all_products)
-
-#     return all_products
-
-
-
-# async def fetch_shopify_products(shop_token: str, shop_name: str):
-#     api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
-#     headers = {'X-Shopify-Access-Token': shop_token}
-    
-#     all_products = []
-#     count = 1
-
-#     async with httpx.AsyncClient() as client:
-#         while api_url:
-#             print(f"Fetching page: {count}")
-#             try:
-#                 response = await client.get(api_url, headers=headers)
-#                 response.raise_for_status()
-#                 data = response.json()
-#                 products = data.get('products', [])
-                
-#                 for product in products:
-#                     product_id = product.get('id')
-#                     image = product.get('image')
-#                     title = product.get('title')
-#                     handle = product.get('handle')
-#                     tags = product.get('tags')
-#                     vendor = product.get('vendor')
-#                     product_type = product.get('product_type')
-                    
-#                     price = product['variants'][0].get('price')
-#                     compare_at_price = product['variants'][0].get('compare_at_price', None) or -1
-#                     image_src = image.get('src') if image else None
-#                     if product_id and image_src:
-#                         all_products.append({
-#                             'id': product_id,
-#                             'image_src': image_src,
-#                             'title': title,
-#                             'handle': handle,
-#                             'price': price,
-#                             'tags': tags,
-#                             'vendor': vendor,
-#                             'product_type': product_type,
-#                             'compare_at_price': compare_at_price
-#                         })
-                
-#                 # Print the Link header for debugging
-#                 link_header = response.headers.get('Link', '')
-#                 print(f"Link header: {link_header}")
-
-#                 # Pagination handling
-#                 next_url = None
-#                 if 'rel="next"' in link_header:
-#                     parts = link_header.split(',')
-#                     for part in parts:
-#                         if 'rel="next"' in part:
-#                             next_url = part.split(';')[0].strip('<> ')
-#                             break
-#                 api_url = next_url
-
-#                 # Increment the page count
-#                 count += 1
-            
-#             except httpx.HTTPStatusError as http_err:
-#                 print(f"HTTP error occurred: {http_err}") 
-#                 break
-#             except Exception as err:
-#                 print(f"An error occurred: {err}")
-#                 break
-
-#     return all_products
-
-
-
-
-
-
-
+# this function gets all the products using the shopify api
 async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int , max_retries: int = 3, retry_delay: float = 1.0):
+    # old urls 
     # api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,title,handle,variants,tags,vendor,product_type&limit=250&status=active'
     # api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250'
     # headers = {'X-Shopify-Access-Token': shop_token}
     
-    all_products = []
-    count = 1
+    all_products = []  # empty array
+    count = 1          # count of page we fetching
 
     # select url based on sync time 
-    # if sync time not 0 then convert sync time to utc here and pass in url 
+    # if sync_time 0, it means that we are performing a sync all all products
     if sync_time == 0:
-        # print("Hello")
         api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250'
 
+    #if sync time is not 0 , then we only sync products updated after the sync date 
     else:
-        # print("Hi")
-        # print(sync_time)
-
         utc_time = sync_time - timedelta(hours=5)  # my server is in pk time so subtracting 5 
 
-        # Convert the datetime object to the desired ISO 8601 format
+        # convert  datetime object to ISO 8601 format
         formatted_datetime = utc_time.strftime('%Y-%m-%dT%H:%M:%S+00:00')
-        # print(formatted_datetime)
 
         api_url = f'https://{shop_name}/admin/api/2024-01/products.json?fields=id,image,status,title,handle,variants,tags,vendor,product_type&limit=250&updated_at_min={formatted_datetime}'
 
@@ -219,10 +76,11 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int
     headers = {'X-Shopify-Access-Token': shop_token}
 
     async with httpx.AsyncClient(timeout=20) as client:
-        while api_url:
+        while api_url:       # since pagination has a link for the nex tpage, we update the api_url everytime and this loops iterates till not empy
             print(f"Fetching page: {count}")
             retries = 0
             
+            # this is done since getching multiple pages causes error, so i try thrice for each page if there is an error
             while retries < max_retries:
                 try:
                     response = await client.get(api_url, headers=headers)
@@ -230,6 +88,7 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int
                     data = response.json()
                     products = data.get('products', [])
 
+                    # for loop to iterate through and extract info form products
                     for product in products:
                         product_id = product.get('id')
                         image = product.get('image')
@@ -257,11 +116,11 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int
                                 'status':status
                             })
 
-                    # Print the Link header for debugging
                     link_header = response.headers.get('Link', '')
-                    print(f"Link header: {link_header}")
+                    # print(f"Link header: {link_header}")
 
                     # Pagination handling
+                    # if contains rel_next then we put that url in api_url varaible 
                     next_url = None
                     if 'rel="next"' in link_header:
                         parts = link_header.split(',')
@@ -271,17 +130,18 @@ async def fetch_shopify_products(shop_token: str, shop_name: str, sync_time: int
                                 break
                     api_url = next_url
 
-                    # Increment the page count
+                    # increment the page count
                     count += 1
-                    break  # Break out of retry loop if successful
+                    break  # Break out of loop if successful
 
+                #retry code 
                 except (httpx.HTTPStatusError, RequestError, TimeoutException) as http_err:
                     retries += 1
                     print(f"Error occurred: {http_err} - Retrying ({retries}/{max_retries})...")
                     if retries == max_retries:
                         print("Max retries reached. Exiting.")
                         return all_products
-                    await asyncio.sleep(retry_delay * retries)  # Exponential backoff
+                    await asyncio.sleep(retry_delay * retries)  
 
                 except Exception as err:
                     print(f"An unexpected error occurred: {err}")
@@ -339,7 +199,7 @@ async def get_shop_synctime(cursor, shop_id):
         await cursor.execute(sql, (shop_id))
         result = await cursor.fetchone()
         if result is None: 
-            return 0  
+            return 0    
         
         return result[0]  
  
@@ -386,6 +246,7 @@ async def insert_sync_time(cursor, sync_time, shop_id):
 
 #function to insert data into chromadb
 def upsert_to_chromadb(collection, product_id, embeddings,metadatas, title):
+    #chromdb function , availbale on the chromadb docs
     collection.upsert(
         ids=[str(product_id)], 
         embeddings=[embeddings], 
@@ -393,18 +254,29 @@ def upsert_to_chromadb(collection, product_id, embeddings,metadatas, title):
         documents=[title]
     )
 
+    # there is a memory leak in when syncing products
+    # this was en effort to detect and fix it 
+    # this slightly helped 
+    del embeddings  # Explicitly delete embeddings
+    del metadatas  # Explicitly delete metadatas
+    gc.collect()  # Trigger garbage collection
 
-#calls all the function and gets products from shopfy to storing them in the chromadb, this is done in the abckground and not on the main thread
+
+#calls all the function and gets products from shopfy to storing them in the chromadb, this is done in the background and not on the main thread
+# this function is also called in the main file
 async def process_products():
     global processing 
+    #to sollve the memory leak issue
+    clear_cache()
     processing = True
     # pool = None
     countobj["total_products"]=0
     countobj["synced_products"]=0
     pool = await get_db_connection()
     try:
-        # pool = await get_db_connection()
+        # while processing is true 
         while processing:
+            #gets the data from the redis list
             item = await redis_client.lindex('sync_queue1', 0)
             print(item)
             length = await redis_client.llen('sync_queue1')
@@ -413,6 +285,7 @@ async def process_products():
                 processing = False
                 break
 
+            #gets the shop name 
             data = json.loads(item)
             shop_name = data.get("shop_name")
 
@@ -422,7 +295,7 @@ async def process_products():
                 async with pool.acquire() as connection:
                     async with connection.cursor() as cursor:
                         shop_id = await get_or_create_shop_id(cursor, shop_name)
-                        print(shop_id)
+                        # print(shop_id)
 
                 # pool.close()
                 # await pool.wait_closed()
@@ -443,7 +316,7 @@ async def process_products():
 
             except Exception as e:
                 print(f"Error fetching shop token: {e}")
-                await redis_client.lpop('sync_queue1')
+                await redis_client.lpop('sync_queue1') # do this so if error it doesnt continue the sync and moves to the next store 
                 continue
 
 
@@ -454,7 +327,7 @@ async def process_products():
                     async with connection.cursor() as cursor:
                         sync_time = await get_shop_synctime(cursor, shop_id)
 
-                print(sync_time)
+                # print(sync_time)
                 # pool.close()
                 # await pool.wait_closed()
 
@@ -468,7 +341,6 @@ async def process_products():
                 async with pool.acquire() as connection:
                     async with connection.cursor() as cursor:
                         pricing_plan = await get_pricing_plan(cursor, shop_id)
-                        pricing_plan = await get_pricing_plan(cursor, shop_id)
                         plan_product_count = pricing_plan['product_count']
                         status = pricing_plan['status']
 
@@ -478,29 +350,20 @@ async def process_products():
                 continue
 
 
-
-            # async with pool.acquire() as connection:
-            #     async with connection.cursor() as cursor:
-            # try:
-            # shop_id = await get_or_create_shop_id(cursor, shop_name)
-            # shop_token = await get_shop_token(cursor, shop_name)
-            # sync_time = await get_shop_synctime(cursor, shop_id)
-            # except Exception as e:
-            # print(f"Error fetching data: {e}")
-            # await redis_client.lpop('sync_queue1')
-            # continue
-
-
-
             products = await fetch_shopify_products(shop_token , shop_name, sync_time)
-            countobj["shop_name"]=shop_name
+            countobj["shop_name"]=shop_name  #updating the global object with the name and total products
             countobj["total_products"]=len(products)
             collection = get_chromadb_collection(shop_name)
 
             batch_size = 100
             # for index, product in enumerate(products):
-            for index, product in enumerate(products[:plan_product_count]):
-                print(index)
+            # this loops means if product count is 0 in the db it eans premium plan and we iterate through all the products
+            # if there is a count in the db then we iterate till that count 
+            for index, product in enumerate(products if plan_product_count == 0 else products[:plan_product_count]):
+                if index > 0 and index % batch_size == 0:
+                    gc.collect()   #garbage collection
+                    await asyncio.sleep(0)
+                
                 product_id = product['id']
                 image_src = product['image_src']
                 title = product['title']
@@ -525,7 +388,7 @@ async def process_products():
                
 
                 try:
-                    img_response = await run_in_threadpool(requests.get, image_src)
+                    img_response = await run_in_threadpool(requests.get, image_src) # this runs in the background so the main thread is free
                     if img_response.status_code != 200:
                         raise ValueError(f"Failed to download image, status code: {img_response.status_code}")
 
@@ -535,19 +398,22 @@ async def process_products():
                     except Exception as e:
                         raise ValueError(f"Error opening image: {e}")
                     
-
+                    # all image format works but it causes problem on png so that why converting only png image to rgb
                     if img.format == 'PNG':
                         img = img.convert('RGB')
 
-                    img = img.resize((299, 299))
+                    img = img.resize((299, 299)) # resizing to the supported size by the model 
                     start_time = time.time()
-                    embeddings = await run_in_threadpool(get_embeddings, img) 
-                    #embeddings,top_categories = await run_in_threadpool(get_embeddings_and_predictions, img)  #approach didint work
-                    await run_in_threadpool(upsert_to_chromadb, collection, product_id, embeddings,metadata, title) 
-                    #await run_in_threadpool(upsert_to_chromadb, collection, product_id, embeddings,metadata, top_categories)   #approach didnt work
+                    # converting pic to vector embedding
+                    embeddings = await run_in_threadpool(get_embeddings, img)   # get_embeddings(img)
 
+                    # saving vector emebdding to chromadb
+                    await run_in_threadpool(upsert_to_chromadb, collection, product_id, embeddings,metadata, title) 
+
+                    #calculating the time for the embedding and processing of the image 
                     end_time = time.time()
                     embedding_time = end_time - start_time
+                    img.close()  # done for memory
                     print(f"Time from image download to saving in ChromaDB for product {product_id}: {embedding_time:.2f} seconds")
 
                     print(f"Processed {index + 1}/{len(products)} products. Remaining: {len(products) - (index + 1)}")
@@ -556,8 +422,16 @@ async def process_products():
                 except Exception as e:
                     print(f"Error processing image for product {product_id} at {image_src}: {e}")
 
+                # done for the memory leak issue
+                del img
+                del embeddings
+                del metadata
+                gc.collect()
+
+                # done for the memory leak issue
                 if (index + 1) % batch_size == 0:
                     gc.collect()
+                    clear_cache()
 
             try:
                 # pool = await get_db_connection()
@@ -579,23 +453,28 @@ async def process_products():
         print(f"Error processing queue: {e}")
 
     finally:
+        # dont for the memory leak isse
         pool.close()
         await pool.wait_closed()
         processing = False
+        gc.collect()
+        clear_cache()
+        # del products 
 
 
 
 
 
 #the router
+#/sync endpoint
 @router.post("/sync")
 async def sync_data(request: Request, background_tasks: BackgroundTasks):
-    global processing
+    global processing  
     try:
         data = await request.json()
         shop_name = data.get("shop_name")
         length = await redis_client.llen('sync_queue1')
-        print(f"Length of sync_queue1: {length}")
+        # print(f"Length of sync_queue1: {length}")
         # await redis_client.delete('sync_queue1')  # This will remove the entire key 'sync_queue1'
 
 
@@ -614,8 +493,8 @@ async def sync_data(request: Request, background_tasks: BackgroundTasks):
         await redis_client.rpush('sync_queue1', data_json)
 
         if processing == False:
-            processing = True
-            background_tasks.add_task(process_products)
+            processing = True # so that the process products functions starts syncing 
+            background_tasks.add_task(process_products)  # we send the response to the user and the server syncs in the background 
 
         return {"status": "success"}
 

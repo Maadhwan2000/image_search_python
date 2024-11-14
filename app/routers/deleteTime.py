@@ -7,7 +7,6 @@ import aiomysql
 from app.db.connections import get_db_connection
 from app.services.chromadb_services import del_chromadb_collection
 
-
 load_dotenv()
 
 redis_url = os.getenv("REDIS_URL")
@@ -16,6 +15,7 @@ redis_client = redis.from_url(redis_url, db=redis_db)
 
 router = APIRouter()
 
+#get the shop id from the db 
 async def get_shop_id(cursor, shop_name):
     """Get the shop id based on shop name."""
     sql = "SELECT id FROM shop_table WHERE shop_name = %s"
@@ -25,11 +25,15 @@ async def get_shop_id(cursor, shop_name):
         return None
     return result[0]
 
+# deletes the sync time from db 
 async def delete_sync_time(cursor, shop_id):
     """Delete the sync_time row based on shop id."""
     sql = "DELETE FROM sync_time WHERE shop_id = %s"
     await cursor.execute(sql, (shop_id,))
 
+
+# we call this api when there is a change in the plan , this is done since if there is no sync time then all products willbe synced from the start
+# we also delete the old collection in this 
 @router.delete("/deleteTime")
 async def delete_sync_data(request: Request):
     try:
@@ -51,8 +55,10 @@ async def delete_sync_data(request: Request):
                 await delete_sync_time(cursor, shop_id)
                 await connection.commit()
 
+        #deleting the chroma collection 
         del_chromadb_collection(shop_name)
 
+        #removing if the shop if it is in the redis queue
         data_to_remove = json.dumps({"shop_name": shop_name})
         await redis_client.lrem('sync_queue1', 0, data_to_remove)
 

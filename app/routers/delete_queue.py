@@ -1,8 +1,3 @@
-#shopname in request
-#check redis queue and remvoe from there
-#chromadb me se remove
-# ye sab bhi threadpool me ho and not on main thread ?
- 
 from fastapi import APIRouter, HTTPException, Request
 import json
 import redis.asyncio as redis
@@ -20,6 +15,7 @@ redis_client = redis.from_url(redis_url, db=redis_db)
 
 router = APIRouter()
 
+# this is called wehn the app is uninstalled 
 @router.delete("/delete")
 async def delete_sync_data(request: Request):
     try:
@@ -29,8 +25,7 @@ async def delete_sync_data(request: Request):
         if not shop_name:
             raise HTTPException(status_code=400, detail="Missing required fields")
         
-        # del_chromadb_collection(shop_name)
-
+        # removing the store form the queue if it is in queue
         queue = await redis_client.lrange('sync_queue1', 0, -1)
         data_to_remove = json.dumps({"shop_name": shop_name})    #converts to json string
 

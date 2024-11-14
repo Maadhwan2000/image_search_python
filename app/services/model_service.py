@@ -6,9 +6,15 @@ from tensorflow.keras.models import Model # type: ignore
 import numpy as np
 import time
 
-base_model = Xception(weights='imagenet')
-model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output)
+base_model = Xception(weights='imagenet')   # Xception model pre-trained on the ImageNet dataset
 
+# Create a new model that outputs the second-to-last layer of the Xception model.
+# This model configuration is typically used to extract high-level features rather than final classification outputs.
+# this is called in the main file
+model = Model(inputs=base_model.input, outputs=base_model.layers[-2].output) 
+
+# Preprocesses an input image for model inference by resizing, 
+# converting to array format, expanding dimensions, and applying  model-specific preprocessing.
 def preprocess_image(img):
     start_time = time.time()
     # img = img.resize((299, 299))  # Resize the image
@@ -17,9 +23,10 @@ def preprocess_image(img):
     img_data = preprocess_input(img_data)
     end_time = time.time()
     preprocessing_time = end_time - start_time
-    print(f"Image preprocessing time: {preprocessing_time:.2f} seconds")
+    # print(f"Image preprocessing time: {preprocessing_time:.2f} seconds")
     return img_data
 
+#converting image into embedding
 def get_embeddings(img):
     img_data = preprocess_image(img)
     start_time = time.time()
@@ -27,7 +34,19 @@ def get_embeddings(img):
     end_time = time.time()
     prediction_time = end_time - start_time
     print(f"Embedding time: {prediction_time:.2f} seconds")
+    # tf.keras.backend.clear_session() 
     return embeddings.flatten().tolist()
+
+# function which clears the tensor flow cache 
+def clear_cache():
+    tf.keras.backend.clear_session() 
+
+
+# the other models tested are commented
+#if u want to use any model below , just update the image.resize according to the model in sync and search api 
+
+
+
 
 
 
