@@ -1,4 +1,23 @@
 imp file :
 
-env file in web folder 
-DATABASE_URL="mysql://root:root@localhost:3306/inventory_sync"
+env file outside app folder :
+
+host=127.0.0.1
+# host = host.docker.internal  # since we need to access the host machine myysql in the docker container 
+user=root
+password=ROOT@siar1234
+db=image_search
+
+CORS_ALLOW_ORIGINS=*
+SERVER_HOST=127.0.0.1
+SERVER_PORT=3002
+LOG_LEVEL=info
+
+REDIS_URL=redis://localhost #:6379
+# REDIS_URL=redis://172.19.0.3:6379
+# REDIS_URL=redis://host.docker.internal # since we need to access the host machine redis in the docker container 
+
+REDIS_DB=0
+
+CHROMADB_HOST=localhost
+# CHROMADB_HOST=172.19.0.2
