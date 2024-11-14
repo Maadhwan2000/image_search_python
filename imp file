@@ -1,0 +1,4 @@
+imp file :
+
+env file in web folder 
+DATABASE_URL="mysql://root:root@localhost:3306/inventory_sync"
